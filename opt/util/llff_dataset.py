@@ -14,6 +14,7 @@ import struct
 import json
 import glob
 import copy
+import pdb
 
 import numpy as np
 import os
@@ -90,6 +91,9 @@ class LLFFDataset(DatasetBase):
         self.is_train_split = is_train_split
 
         self._load_images()
+        #TODO : modified
+        # self.n_images, self.h_full, self.w_full, _ = self.gt.shape
+
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
         assert self.h_full == self.sfm.ref_cam["height"]
         assert self.w_full == self.sfm.ref_cam["width"]
@@ -144,6 +148,14 @@ class LLFFDataset(DatasetBase):
                         newh = round(h * scale)
                         neww = round(w * scale)
                     img = cv2.resize(img, (neww, newh), interpolation=cv2.INTER_AREA)
+                
+                # img_expand = np.zeros((img.shape[0],img.shape[1],3))
+                # img_expand[:,:,0] = img
+                # img_expand[:,:,1] = img
+                # img_expand[:,:,2] = img
+                img = np.expand_dims(img, axis=-1)
+                # cv2.imwrite('color_img.jpg', img_expand)
+                # all_gt.append(torch.from_numpy(img_expand))
                 all_gt.append(torch.from_numpy(img))
         self.gt = torch.stack(all_gt).float() / 255.0
         if self.gt.size(-1) == 4:

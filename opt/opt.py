@@ -274,6 +274,7 @@ dset = datasets[args.dataset_type](
                n_images=args.n_train,
                **config_util.build_data_options(args))
 
+
 if args.background_nlayers > 0 and not dset.should_use_background:
     warn('Using a background model for dataset type ' + str(type(dset)) + ' which typically does not use background')
 
@@ -295,6 +296,8 @@ grid = svox2.SparseGrid(reso=reso_list[reso_id],
                         mlp_width=args.mlp_width,
                         background_nlayers=args.background_nlayers,
                         background_reso=args.background_reso)
+
+                        
 
 # DC -> gray; mind the SH scaling!
 grid.sh_data.data[:] = 0.0
@@ -484,6 +487,7 @@ while True:
             lr_basis = lr_basis_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
             lr_sigma_bg = lr_sigma_bg_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
             lr_color_bg = lr_color_bg_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
+
             if not args.lr_decay:
                 lr_sigma = args.lr_sigma * lr_sigma_factor
                 lr_sh = args.lr_sh * lr_sh_factor
@@ -612,7 +616,9 @@ while True:
             factor, args.save_every) == 0 and not args.tune_mode:
         print('Saving', ckpt_path)
         grid.save(ckpt_path)
-
+        import pdb
+        pdb.set_trace()
+        print("saved!")
     if (gstep_id_base - last_upsamp_step) >= args.upsamp_every:
         last_upsamp_step = gstep_id_base
         if reso_id < len(reso_list) - 1:

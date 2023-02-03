@@ -87,8 +87,8 @@ if args.timing:
 if not args.no_lpips:
     import lpips
     lpips_vgg = lpips.LPIPS(net="vgg").eval().to(device)
-if not path.isfile(args.ckpt):
-    args.ckpt = path.join(args.ckpt, 'ckpt.npz')
+# if not path.isfile(args.ckpt):
+#     args.ckpt = path.join(args.ckpt, 'ckpt.npz')
 
 render_dir = path.join(path.dirname(args.ckpt),
             'train_renders' if args.train else 'test_renders')
@@ -111,6 +111,8 @@ if args.ray_len:
 dset = datasets[args.dataset_type](args.data_dir, split="test_train" if args.train else "test",
                                     **config_util.build_data_options(args))
 
+# import pdb
+# pdb.set_trace()
 grid = svox2.SparseGrid.load(args.ckpt, device=device)
 
 if grid.use_background:
