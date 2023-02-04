@@ -616,8 +616,6 @@ while True:
             factor, args.save_every) == 0 and not args.tune_mode:
         print('Saving', ckpt_path)
         grid.save(ckpt_path)
-        import pdb
-        pdb.set_trace()
         print("saved!")
     if (gstep_id_base - last_upsamp_step) >= args.upsamp_every:
         last_upsamp_step = gstep_id_base
