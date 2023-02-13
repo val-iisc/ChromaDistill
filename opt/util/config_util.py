@@ -31,7 +31,7 @@ def define_common_args(parser : argparse.ArgumentParser):
                          help="Sequence ID (for CO3D only)")
     group.add_argument('--epoch_size',
                          type=int,
-                         default=1280,
+                         default=12800,
                          help="Pseudo-epoch size in term of batches (to be consistent across datasets)")
     group.add_argument('--white_bkgd',
                          type=bool,

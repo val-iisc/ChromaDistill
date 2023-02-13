@@ -49,7 +49,7 @@ group.add_argument('--reso',
                             'stays at the last one; ' +
                             'should be a list where each item is a list of 3 ints or an int')
 group.add_argument('--upsamp_every', type=int, default=
-                     3 * 1200,
+                     3 * 12800,
                     help='upsample the grid every x iters')
 group.add_argument('--init_iters', type=int, default=
                      0,
@@ -366,6 +366,46 @@ lr_basis_factor = 1.0
 
 last_upsamp_step = args.init_iters
 
+
+def rgb_to_lab(srgb):
+
+	srgb_pixels = torch.reshape(srgb, [-1, 3])
+
+	linear_mask = (srgb_pixels <= 0.04045).type(torch.FloatTensor).cuda()
+	exponential_mask = (srgb_pixels > 0.04045).type(torch.FloatTensor).cuda()
+	rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
+	
+	rgb_to_xyz = torch.tensor([
+				#    X        Y          Z
+				[0.412453, 0.212671, 0.019334], # R
+				[0.357580, 0.715160, 0.119193], # G
+				[0.180423, 0.072169, 0.950227], # B
+			]).type(torch.FloatTensor).cuda()
+	
+	xyz_pixels = torch.mm(rgb_pixels, rgb_to_xyz)
+	
+
+	# XYZ to Lab
+	xyz_normalized_pixels = torch.mul(xyz_pixels, torch.tensor([1/0.950456, 1.0, 1/1.088754]).type(torch.FloatTensor).cuda())
+
+	epsilon = 6.0/29.0
+
+	linear_mask = (xyz_normalized_pixels <= (epsilon**3)).type(torch.FloatTensor).cuda()
+
+	exponential_mask = (xyz_normalized_pixels > (epsilon**3)).type(torch.FloatTensor).cuda()
+
+	fxfyfz_pixels = (xyz_normalized_pixels / (3 * epsilon**2) + 4.0/29.0) * linear_mask + ((xyz_normalized_pixels+0.000001) ** (1.0/3.0)) * exponential_mask
+	# convert to lab
+	fxfyfz_to_lab = torch.tensor([
+		#  l       a       b
+		[  0.0,  500.0,    0.0], # fx
+		[116.0, -500.0,  200.0], # fy
+		[  0.0,    0.0, -200.0], # fz
+	]).type(torch.FloatTensor).cuda()
+	lab_pixels = torch.mm(fxfyfz_pixels, fxfyfz_to_lab) + torch.tensor([-16.0, 0.0, 0.0]).type(torch.FloatTensor).cuda()
+	#return tf.reshape(lab_pixels, tf.shape(srgb))
+	return torch.reshape(lab_pixels, srgb.shape)
+
 if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
@@ -380,7 +420,7 @@ while True:
         # Put in a function to avoid memory leak
         print('Eval step')
         with torch.no_grad():
-            stats_test = {'psnr' : 0.0, 'mse' : 0.0}
+            stats_test = {'psnr' : 0.0, 'mse' : 0.0, 'mse_distillation': 0.0}
 
             # Standard set
             N_IMGS_TO_EVAL = min(20 if epoch_id > 0 else 5, dset_test.n_images)
@@ -410,7 +450,13 @@ while True:
                 rgb_pred_test = grid.volume_render_image(cam, use_kernel=True)
                 rgb_gt_test = dset_test.gt[img_id].to(device=device)
                 rgb_teacher_gt_test = dset_test.teacher_gt[img_id].to(device=device)
-                all_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
+                import numpy as np
+                cv2.imwrite("eval_pred.png",  cv2.cvtColor((rgb_pred_test.detach().cpu().numpy() * 255).astype(np.uint8), cv2.COLOR_BGR2RGB))
+                # all_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
+                all_mses = ((rgb_to_lab(rgb_gt_test) - rgb_to_lab(rgb_pred_test)) ** 2).cpu()
+                
+                # distilation_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
+                distilation_mses = ((rgb_to_lab(rgb_gt_test) - rgb_to_lab(rgb_pred_test)) ** 2).cpu()
                 if i % img_save_interval == 0:
                     img_pred = rgb_pred_test.cpu()
                     img_pred.clamp_max_(1.0)
@@ -432,12 +478,14 @@ while True:
 
                 rgb_pred_test = rgb_gt_test = None
                 mse_num : float = all_mses.mean().item()
+                mse_distillation : float = distilation_mses.mean().item()
                 psnr = -10.0 * math.log10(mse_num)
                 if math.isnan(psnr):
                     print('NAN PSNR', i, img_id, mse_num)
                     assert False
                 stats_test['mse'] += mse_num
                 stats_test['psnr'] += psnr
+                stats_test['mse_distillation'] += mse_distillation
                 n_images_gen += 1
 
             if grid.basis_type == svox2.BASIS_TYPE_3D_TEXTURE or \
@@ -510,18 +558,17 @@ while True:
                     sparsity_loss=args.lambda_sparsity,
                     randomize=args.enable_random)
 
-            # if epoch_id > 4:
-            lab_gt = color.rgb2lab(rgb_gt.detach().cpu().numpy())
-            lab_teacher_gt = color.rgb2lab(teacher_gt.detach().cpu().numpy())
-            lab_pred = color.rgb2lab(rgb_pred.detach().cpu().numpy())
+            
+            lab_gt = rgb_to_lab(rgb_gt)
+            lab_teacher_gt = rgb_to_lab(teacher_gt)
+            lab_pred = rgb_to_lab(rgb_pred)
+            
+            lab_mse = F.mse_loss(lab_teacher_gt,lab_pred)
 
-            lab_mse = F.mse_loss(torch.from_numpy(lab_teacher_gt), torch.from_numpy(lab_pred))
-
-            # else:
-            mse = F.mse_loss(rgb_gt, rgb_pred)
-
-            # Stats
-            # if epoch_id > 4:
+            # lab_mse = 10 * (F.mse_loss(teacher_gt,rgb_pred))
+ 
+            # mse = F.mse_loss(rgb_gt, rgb_pred)
+            mse = F.mse_loss(lab_gt, lab_pred)
 
             lab_mse_num : float = lab_mse.detach().item()
             # psnr = -10.0 * math.log10(lab_mse_num)

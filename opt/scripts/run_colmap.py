@@ -393,7 +393,7 @@ if __name__ == '__main__':
                     '--images-resized', default='images_resized', help='location for resized/renamed images')
     parser.add_argument(
         '--do-sequential', action='store_true', default=False, help='sequential rather than exhaustive matching')
-    parser.add_argument('--max-width', type=int, default=1280, help='max image width')
+    parser.add_argument('--max-width', type=int, default=12800, help='max image width')
     parser.add_argument('--max-height', type=int, default=768, help='max image height')
     parser.add_argument(
             '--undistorted-output', default='images', help='location of undistorted images')
