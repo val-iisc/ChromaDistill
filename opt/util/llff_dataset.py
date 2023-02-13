@@ -58,7 +58,7 @@ class LLFFDataset(DatasetBase):
         super().__init__()
         if scale is None:
             scale = 1.0 / 4.0  # Default 1/4 size for LLFF data since it's huge
-        self.scale = scale
+        self.scale = 1.0
         self.dataset = root
         self.epoch_size = epoch_size
         self.device = device
@@ -88,6 +88,7 @@ class LLFFDataset(DatasetBase):
             img_train_split = ind % hold_every > 0
             if is_train_split == img_train_split:
                 self.imgs.append(img)
+
         self.is_train_split = is_train_split
 
         self._load_images()
@@ -95,6 +96,7 @@ class LLFFDataset(DatasetBase):
         # self.n_images, self.h_full, self.w_full, _ = self.gt.shape
 
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
+
         assert self.h_full == self.sfm.ref_cam["height"]
         assert self.w_full == self.sfm.ref_cam["width"]
 
@@ -113,11 +115,11 @@ class LLFFDataset(DatasetBase):
             self.intrins = self.intrins_full
         self.should_use_background = False  # Give warning
 
-
     def _load_images(self):
         scale = self.scale
 
         all_gt = []
+        all_teacher_gt = []
         all_c2w = []
         bottom = np.array([[0.0, 0.0, 0.0, 1.0]], dtype=np.float32)
         global_w2rc = np.concatenate([self.sfm.ref_img['r'], self.sfm.ref_img['t']], axis=1)
@@ -139,6 +141,11 @@ class LLFFDataset(DatasetBase):
                     if os.path.exists(path_noext + '.png'):
                         img_path = path_noext + '.png'
                 img = imageio.imread(img_path)
+                img = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
+
+                teacher_img = imageio.imread(img_path.replace("images", "teacher_images"))
+                teacher_img = cv2.resize(teacher_img, (1008, 752), interpolation=cv2.INTER_AREA)
+
                 if scale != 1 and not self.sfm.use_integral_scaling:
                     h, w = img.shape[:2]
                     if self.sfm.dataset_type == "deepview":
@@ -148,19 +155,23 @@ class LLFFDataset(DatasetBase):
                         newh = round(h * scale)
                         neww = round(w * scale)
                     img = cv2.resize(img, (neww, newh), interpolation=cv2.INTER_AREA)
-                
+
                 img_expand = np.zeros((img.shape[0],img.shape[1],3))
                 img_expand[:,:,0] = img
                 img_expand[:,:,1] = img
                 img_expand[:,:,2] = img
                 # img = np.expand_dims(img, axis=-1)
-                cv2.imwrite('color_img.jpg', img)
+
                 all_gt.append(torch.from_numpy(img_expand))
+                all_teacher_gt.append(torch.from_numpy(teacher_img))
                 # all_gt.append(torch.from_numpy(img))
         self.gt = torch.stack(all_gt).float() / 255.0
+        self.teacher_gt = torch.stack(all_teacher_gt).float() / 255.0
         if self.gt.size(-1) == 4:
             # Apply alpha channel
             self.gt = self.gt[..., :3] * self.gt[..., 3:] + (1.0 - self.gt[..., 3:])
+        if self.teacher_gt.size(-1) == 4:
+            self.teacher_gt = self.teacher_gt[..., :3] * self.teacher_gt[..., 3:] + (1.0 - self.teacher_gt[..., 3:])
         self.c2w = torch.stack(all_c2w)
         bds_scale = 1.0
         self.z_bounds = [self.sfm.dmin * bds_scale, self.sfm.dmax * bds_scale]
@@ -205,7 +216,7 @@ class LLFFDataset(DatasetBase):
                 self.ndc_coeffs)
         dirs /= torch.norm(dirs, dim=-1, keepdim=True)
 
-        self.rays_init = Rays(origins=origins, dirs=dirs, gt=self.rays.gt)
+        self.rays_init = Rays(origins=origins, dirs=dirs, gt=self.rays.gt, teacher_gt=self.rays.teacher_gt)
         self.rays = self.rays_init
 
 
@@ -424,8 +435,8 @@ class SfMData:
 
             nw = round(ocam["width"] * scale)
             nh = round(ocam["height"] * scale)
-            sw = nw / ocam["width"]
-            sh = nh / ocam["height"]
+            sw = 1008 / ocam["width"]
+            sh = 752 / ocam["height"]
             cam["fx"] = ocam["fx"] * sw
             cam["fy"] = ocam["fy"] * sh
             # TODO: What is the correct way?
@@ -433,8 +444,8 @@ class SfMData:
             #  cam["py"] = (ocam["py"] + 0.5) * sh - 0.5
             cam["px"] = ocam["px"] * sw
             cam["py"] = ocam["py"] * sh
-            cam["width"] = nw
-            cam["height"] = nh
+            cam["width"] = 1008
+            cam["height"] = 752
 
     def readDeepview(self, dataset):
         if not os.path.exists(os.path.join(dataset, "models.json")):

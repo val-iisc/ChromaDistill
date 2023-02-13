@@ -12,7 +12,8 @@ class DatasetBase:
     w_full: int
     intrins_full: Intrin
     c2w: torch.Tensor  # C2W OpenCV poses
-    gt: Union[torch.Tensor, List[torch.Tensor]]   # RGB images
+    gt: Union[torch.Tensor, List[torch.Tensor]] # RGB images
+    teacher_gt: Union[torch.Tensor, List[torch.Tensor]] # teacher images
     device : Union[str, torch.device]
 
     def __init__(self):
@@ -58,16 +59,21 @@ class DatasetBase:
             gt = F.interpolate(
                 self.gt.permute([0, 3, 1, 2]), size=(self.h, self.w), mode="area"
             ).permute([0, 2, 3, 1])
+            teacher_gt = F.interpolate(
+                self.teacher_gt.permute([0, 3, 1, 2]), size=(self.h, self.w), mode="area"
+            ).permute([0, 2, 3, 1])
             gt = gt.reshape(self.n_images, -1, 3)
+            teacher_gt = teacher_gt.reshape(self.n_images, -1, 3)
         else:
             gt = self.gt.reshape(self.n_images, -1, 3)
+            teacher_gt = self.teacher_gt.reshape(self.n_images, -1, 3)
         origins = self.c2w[:, None, :3, 3].expand(-1, self.h * self.w, -1).contiguous()
         if self.split == "train":
             origins = origins.view(-1, 3)
             dirs = dirs.view(-1, 3)
             gt = gt.reshape(-1, 3)
-
-        self.rays_init = Rays(origins=origins, dirs=dirs, gt=gt)
+            teacher_gt = teacher_gt.reshape(-1, 3)
+        self.rays_init = Rays(origins=origins, dirs=dirs, gt=gt, teacher_gt = teacher_gt)
         self.rays = self.rays_init
 
     def get_image_size(self, i : int):

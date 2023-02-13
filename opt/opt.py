@@ -28,6 +28,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
 from typing import NamedTuple, Optional, Union
+from skimage import io, color
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -48,7 +49,7 @@ group.add_argument('--reso',
                             'stays at the last one; ' +
                             'should be a list where each item is a list of 3 ints or an int')
 group.add_argument('--upsamp_every', type=int, default=
-                     3 * 12800,
+                     3 * 1200,
                     help='upsample the grid every x iters')
 group.add_argument('--init_iters', type=int, default=
                      0,
@@ -408,6 +409,7 @@ while True:
                                    ndc_coeffs=dset_test.ndc_coeffs)
                 rgb_pred_test = grid.volume_render_image(cam, use_kernel=True)
                 rgb_gt_test = dset_test.gt[img_id].to(device=device)
+                rgb_teacher_gt_test = dset_test.teacher_gt[img_id].to(device=device)
                 all_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
                 if i % img_save_interval == 0:
                     img_pred = rgb_pred_test.cpu()
@@ -477,7 +479,8 @@ while True:
     def train_step():
         print('Train step')
         pbar = tqdm(enumerate(range(0, epoch_size, args.batch_size)), total=batches_per_epoch)
-        stats = {"mse" : 0.0, "psnr" : 0.0, "invsqr_mse" : 0.0}
+        stats = {"mse" : 0.0, "psnr" : 0.0, "invsqr_mse" : 0.0, "lab_mse" : 0.0, "invsqr_lab_mse" : 0.0}
+        
         for iter_id, batch_begin in pbar:
             gstep_id = iter_id + gstep_id_base
             if args.lr_fg_begin_step > 0 and gstep_id == args.lr_fg_begin_step:
@@ -497,18 +500,35 @@ while True:
             batch_origins = dset.rays.origins[batch_begin: batch_end]
             batch_dirs = dset.rays.dirs[batch_begin: batch_end]
             rgb_gt = dset.rays.gt[batch_begin: batch_end]
+            teacher_gt = dset.rays.teacher_gt[batch_begin: batch_end]
             rays = svox2.Rays(batch_origins, batch_dirs)
 
             #  with Timing("volrend_fused"):
+            
             rgb_pred = grid.volume_render_fused(rays, rgb_gt,
                     beta_loss=args.lambda_beta,
                     sparsity_loss=args.lambda_sparsity,
                     randomize=args.enable_random)
 
-            #  with Timing("loss_comp"):
+            # if epoch_id > 4:
+            lab_gt = color.rgb2lab(rgb_gt.detach().cpu().numpy())
+            lab_teacher_gt = color.rgb2lab(teacher_gt.detach().cpu().numpy())
+            lab_pred = color.rgb2lab(rgb_pred.detach().cpu().numpy())
+
+            lab_mse = F.mse_loss(torch.from_numpy(lab_teacher_gt), torch.from_numpy(lab_pred))
+
+            # else:
             mse = F.mse_loss(rgb_gt, rgb_pred)
 
             # Stats
+            # if epoch_id > 4:
+
+            lab_mse_num : float = lab_mse.detach().item()
+            # psnr = -10.0 * math.log10(lab_mse_num)
+            stats['lab_mse'] += lab_mse_num
+            # stats['psnr'] += psnr
+            stats['invsqr_lab_mse'] += 1.0 / lab_mse_num ** 2
+        
             mse_num : float = mse.detach().item()
             psnr = -10.0 * math.log10(mse_num)
             stats['mse'] += mse_num
