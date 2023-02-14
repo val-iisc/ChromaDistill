@@ -27,11 +27,13 @@ from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
 import cv2
+import pdb
 
 from icecream import ic
 
 # from style_transfer_losses import StyleTransferLosses
 from nnfm_loss import NNFMLoss, match_colors_for_image_set
+import os
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -534,6 +536,34 @@ style_img = torch.from_numpy(style_img).to(device=device)
 ic("Style image: ", args.style, style_img.shape)
 
 
+TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/llff/fern/teacher_images/"
+teacher_images = os.listdir(TEACHER_PATH)
+for image in teacher_images:
+    teacher_img = imageio.imread(os.path.join(TEACHER_PATH, image)).astype(np.float32) / 255.0
+    style_h, style_w = teacher_img.shape[:2]
+    content_long_side = max([dset.w, dset.h])
+    if style_h > style_w:
+        teacher_img = cv2.resize(
+            teacher_img,
+            (int(content_long_side / style_h * style_w), content_long_side),
+            interpolation=cv2.INTER_AREA,
+        )
+    else:
+        teacher_img = cv2.resize(
+            teacher_img,
+            (content_long_side, int(content_long_side / style_w * style_h)),
+            interpolation=cv2.INTER_AREA,
+        )
+    teacher_img = cv2.resize(
+        teacher_img,
+        (teacher_img.shape[1] // 2, teacher_img.shape[0] // 2),
+        interpolation=cv2.INTER_AREA,
+    )
+    imageio.imwrite(
+        os.path.join(TEACHER_PATH, image),
+        np.clip(teacher_img * 255.0, 0.0, 255.0).astype(np.uint8),
+    )
+
 global_start_time = datetime.now()
 
 if not args.no_pre_ct:
@@ -547,8 +577,43 @@ batch_size = None
 
 nnfm_loss_fn = NNFMLoss(device=device)
 
+
 while True:
+
     def train_step(optim_type):
+        
+        #Debuging mismatch
+        for zz in range(100):
+            num_views, view_height, view_width = dset.n_images, dset.h, dset.w
+            print(zz)
+            import pdb
+            pdb.set_trace()
+            img_id = np.random.randint(low=0, high=dset.n_images)
+
+            if img_id <10:
+                selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image00{img_id}.JPG")).astype(np.float32) / 255.0
+            else:
+                selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
+
+            print("teacher_rgb_id", img_id)
+            
+            cv2.imwrite("teacher_img.png", (selected_teacher_img * 255).astype(np.uint8))
+
+            cam = svox2.Camera(
+                dset.c2w[img_id].to(device=device),
+                dset.intrins.get("fx", img_id),
+                dset.intrins.get("fy", img_id),
+                dset.intrins.get("cx", img_id),
+                dset.intrins.get("cy", img_id),
+                width=view_width,
+                height=view_height,
+                ndc_coeffs=dset.ndc_coeffs,
+            )
+            print("pred_rgb_id", img_id)
+            rgb_pred = grid.volume_render_image(cam, use_kernel=True)
+
+            cv2.imwrite("pred_img.png", (rgb_pred.detach().cpu().numpy() * 255).astype(np.uint8))
+
         ic("Training epoch: ", epoch_id, epoch_size, batches_per_epoch, batch_size, optim_type)
         pbar = tqdm(enumerate(range(0, epoch_size, batch_size)), total=batches_per_epoch)
         for iter_id, batch_begin in pbar:
@@ -601,17 +666,37 @@ while True:
                             height=view_height,
                             ndc_coeffs=dset.ndc_coeffs,
                         )
+                        print("pred_rgb_id", img_id)
                         rgb_pred = grid.volume_render_image(cam, use_kernel=True)
+                        
+                        if img_id <10:
+                            selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image00{img_id}.JPG")).astype(np.float32) / 255.0
+                        else:
+                            selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
+
+                        print("teacher_rgb_id", img_id)
+                        
+                        cv2.imwrite("teacher_img.png", (selected_teacher_img * 255).astype(np.uint8))
+                        selected_teacher_img = torch.from_numpy(selected_teacher_img).to(device=device)
+
+                        cv2.imwrite("pred_img.png", (rgb_pred.detach().cpu().numpy() * 255).astype(np.uint8))
+                        # import pdb
+                        # pdb.set_trace()
                         rgb_gt = dset.rays.gt.view(num_views, view_height, view_width, 3)[img_id].to(
                             device
                         )
+                        teacher_gt = dset.rays.teacher_gt.view(num_views, view_height, view_width, 3)[img_id].to(
+                            device
+                        )
                         rgb_gt = rgb_gt.permute(2, 0, 1).unsqueeze(0).contiguous()
+                        teacher_gt = teacher_gt.permute(2, 0, 1).unsqueeze(0).contiguous()
                         rgb_pred = rgb_pred.permute(2, 0, 1).unsqueeze(0).contiguous()
 
                     rgb_pred.requires_grad_(True)
                     w_variance = torch.mean(torch.pow(rgb_pred[:, :, :, :-1] - rgb_pred[:, :, :, 1:], 2))
                     h_variance = torch.mean(torch.pow(rgb_pred[:, :, :-1, :] - rgb_pred[:, :, 1:, :], 2))
                     img_tv_loss = args.img_tv_weight * (h_variance + w_variance) / 2.0
+                    
                     loss_dict = nnfm_loss_fn(
                         F.interpolate(
                             rgb_pred,
@@ -619,11 +704,12 @@ while True:
                             scale_factor=0.5,
                             mode="bilinear",
                         ),
-                        style_img.permute(2, 0, 1).unsqueeze(0),
+                        selected_teacher_img.permute(2, 0, 1).unsqueeze(0),
                         blocks=[
                             args.vgg_block,
                         ],
-                        loss_names=["nnfm_loss", "content_loss"],
+                        # loss_names=["nnfm_loss", "content_loss"],
+                        loss_names=["lab_loss_a", "lab_loss_b", "lab_loss_l", "content_loss"],
                         contents=F.interpolate(
                             rgb_gt,
                             size=None,

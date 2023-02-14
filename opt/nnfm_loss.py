@@ -2,7 +2,54 @@ import torch
 import torchvision
 from icecream import ic
 
+def preprocess_lab(lab):
+    lab = lab.reshape(376, 504, 3) #hard coded
+    L_chan, a_chan, b_chan =torch.unbind(lab,dim=2)
+    # L_chan: black and white with input range [0, 100]
+    # a_chan/b_chan: color channels with input range ~[-110, 110], not exact
+    # [0, 100] => [-1, 1],  ~[-110, 110] => [-1, 1]
+    return [L_chan / 50.0 - 1.0, a_chan / 110.0, b_chan / 110.0]
 
+def rgb_to_lab(srgb):
+
+	srgb_pixels = torch.reshape(srgb, [-1, 3])
+
+	linear_mask = (srgb_pixels <= 0.04045).type(torch.FloatTensor).cuda()
+	exponential_mask = (srgb_pixels > 0.04045).type(torch.FloatTensor).cuda()
+	rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
+	
+	rgb_to_xyz = torch.tensor([
+				#    X        Y          Z
+				[0.412453, 0.212671, 0.019334], # R
+				[0.357580, 0.715160, 0.119193], # G
+				[0.180423, 0.072169, 0.950227], # B
+			]).type(torch.FloatTensor).cuda()
+	
+	xyz_pixels = torch.mm(rgb_pixels, rgb_to_xyz)
+	
+
+	# XYZ to Lab
+	xyz_normalized_pixels = torch.mul(xyz_pixels, torch.tensor([1/0.950456, 1.0, 1/1.088754]).type(torch.FloatTensor).cuda())
+
+	epsilon = 6.0/29.0
+
+	linear_mask = (xyz_normalized_pixels <= (epsilon**3)).type(torch.FloatTensor).cuda()
+
+	exponential_mask = (xyz_normalized_pixels > (epsilon**3)).type(torch.FloatTensor).cuda()
+
+	fxfyfz_pixels = (xyz_normalized_pixels / (3 * epsilon**2) + 4.0/29.0) * linear_mask + ((xyz_normalized_pixels+0.000001) ** (1.0/3.0)) * exponential_mask
+	# convert to lab
+	fxfyfz_to_lab = torch.tensor([
+		#  l       a       b
+		[  0.0,  500.0,    0.0], # fx
+		[116.0, -500.0,  200.0], # fy
+		[  0.0,    0.0, -200.0], # fz
+	]).type(torch.FloatTensor).cuda()
+	lab_pixels = torch.mm(fxfyfz_pixels, fxfyfz_to_lab) + torch.tensor([-16.0, 0.0, 0.0]).type(torch.FloatTensor).cuda()
+	#return tf.reshape(lab_pixels, tf.shape(srgb))
+	return torch.reshape(lab_pixels, srgb.shape)
+
+    
 def match_colors_for_image_set(image_set, style_img):
     """
     image_set: [N, H, W, 3]
@@ -143,9 +190,16 @@ class NNFMLoss(torch.nn.Module):
         ],
         loss_names=["nnfm_loss"],  # can also include 'gram_loss', 'content_loss'
         contents=None,
-    ):
+    ):  
+
+        style_img = rgb_to_lab(styles)
+        outputs_img = rgb_to_lab(outputs) 
+
+        style_L_chan, style_a_chan, style_b_chan = preprocess_lab(style_img)
+        outputs_L_chan, outputs_a_chan, outputs_b_chan = preprocess_lab(outputs_img)
+
         for x in loss_names:
-            assert x in ['nnfm_loss', 'content_loss', 'gram_loss']
+            assert x in ['nnfm_loss', 'content_loss', 'gram_loss', 'lab_loss_a', 'lab_loss_b', 'lab_loss_l']
 
         block_indexes = [[1, 3], [6, 8], [11, 13, 15], [18, 20, 22], [25, 27, 29]]
 
@@ -181,6 +235,23 @@ class NNFMLoss(torch.nn.Module):
             if "content_loss" in loss_names:
                 content_feats = torch.cat([content_feats_all[ix_map[ix]] for ix in layers], 1)
                 loss_dict["content_loss"] += torch.mean((content_feats - x_feats) ** 2)
+
+            if "lab_loss_a" in loss_names:
+                loss = torch.nn.L1Loss()
+                loss_a = torch.mean(torch.abs(style_a_chan - outputs_a_chan))
+                loss_dict["lab_loss_a"] += loss_a
+                
+            if "lab_loss_b" in loss_names:
+                loss = torch.nn.L1Loss()
+                loss_b = torch.mean(torch.abs(style_b_chan - outputs_b_chan))
+                loss_dict["lab_loss_b"] += loss_b 
+            
+            if "lab_loss_l" in loss_names:
+                loss = torch.nn.L1Loss()
+                loss_l = torch.mean(torch.abs(style_L_chan - outputs_L_chan))
+                loss_dict["lab_loss_l"] += loss_l 
+            
+
 
         return loss_dict
 

@@ -367,8 +367,6 @@ lr_basis_factor = 1.0
 last_upsamp_step = args.init_iters
 
 
-def rgb_to_lab(srgb):
-
 	srgb_pixels = torch.reshape(srgb, [-1, 3])
 
 	linear_mask = (srgb_pixels <= 0.04045).type(torch.FloatTensor).cuda()
