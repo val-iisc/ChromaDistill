@@ -536,7 +536,14 @@ style_img = torch.from_numpy(style_img).to(device=device)
 ic("Style image: ", args.style, style_img.shape)
 
 
-TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/llff/fern/teacher_images/"
+TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/llff/fern/train_teacher_images/"
+
+
+for image in range(dset.n_images):
+    # teacher_img = imageio.imread(os.path.join(TEACHER_PATH, image)).astype(np.float32) / 255.0
+    teacher_img = dset.teacher_gt[image]
+    cv2.imwrite(os.path.join(TEACHER_PATH, f"image0{image}.JPG"), cv2.cvtColor((teacher_img.detach().cpu().numpy() * 255).astype(np.uint8), cv2.COLOR_BGR2RGB))
+
 teacher_images = os.listdir(TEACHER_PATH)
 for image in teacher_images:
     teacher_img = imageio.imread(os.path.join(TEACHER_PATH, image)).astype(np.float32) / 255.0
@@ -581,39 +588,6 @@ nnfm_loss_fn = NNFMLoss(device=device)
 while True:
 
     def train_step(optim_type):
-        
-        #Debuging mismatch
-        for zz in range(100):
-            num_views, view_height, view_width = dset.n_images, dset.h, dset.w
-            print(zz)
-            import pdb
-            pdb.set_trace()
-            img_id = np.random.randint(low=0, high=dset.n_images)
-
-            if img_id <10:
-                selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image00{img_id}.JPG")).astype(np.float32) / 255.0
-            else:
-                selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
-
-            print("teacher_rgb_id", img_id)
-            
-            cv2.imwrite("teacher_img.png", (selected_teacher_img * 255).astype(np.uint8))
-
-            cam = svox2.Camera(
-                dset.c2w[img_id].to(device=device),
-                dset.intrins.get("fx", img_id),
-                dset.intrins.get("fy", img_id),
-                dset.intrins.get("cx", img_id),
-                dset.intrins.get("cy", img_id),
-                width=view_width,
-                height=view_height,
-                ndc_coeffs=dset.ndc_coeffs,
-            )
-            print("pred_rgb_id", img_id)
-            rgb_pred = grid.volume_render_image(cam, use_kernel=True)
-
-            cv2.imwrite("pred_img.png", (rgb_pred.detach().cpu().numpy() * 255).astype(np.uint8))
-
         ic("Training epoch: ", epoch_id, epoch_size, batches_per_epoch, batch_size, optim_type)
         pbar = tqdm(enumerate(range(0, epoch_size, batch_size)), total=batches_per_epoch)
         for iter_id, batch_begin in pbar:
@@ -669,10 +643,7 @@ while True:
                         print("pred_rgb_id", img_id)
                         rgb_pred = grid.volume_render_image(cam, use_kernel=True)
                         
-                        if img_id <10:
-                            selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image00{img_id}.JPG")).astype(np.float32) / 255.0
-                        else:
-                            selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
+                        selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
 
                         print("teacher_rgb_id", img_id)
                         
@@ -874,8 +845,8 @@ while True:
                     )
                     rgb_pred = grid.volume_render_image(cam, use_kernel=True)
                     rgb_gt[img_id] = rgb_pred.reshape(view_height, view_width, 3).contiguous().cpu().clamp_(0.0, 1.0)
-            dset.rays.gt, color_tf = match_colors_for_image_set(dset.rays.gt, style_img)
-            grid.apply_ct(color_tf.detach().cpu().numpy())
+            # dset.rays.gt, color_tf = match_colors_for_image_set(dset.rays.gt, style_img)
+            # grid.apply_ct(color_tf.detach().cpu().numpy())
 
         global_stop_time = datetime.now()
         secs = (global_stop_time - global_start_time).total_seconds()
