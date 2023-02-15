@@ -505,9 +505,9 @@ last_upsamp_step = args.init_iters
 if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
-
-TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/llff/fern/train_teacher_images/"
-
+TEACHER_PATH = os.path.join(dset.dataset, "train_teacher_images")
+if not os.path.isdir(TEACHER_PATH):
+    os.makedirs(TEACHER_PATH)
 
 for image in range(dset.n_images):
     # teacher_img = imageio.imread(os.path.join(TEACHER_PATH, image)).astype(np.float32) / 255.0
