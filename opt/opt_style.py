@@ -507,35 +507,6 @@ if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
 
-###### resize style image such that its long side matches the long side of content images
-style_img = imageio.imread(args.style).astype(np.float32) / 255.0
-style_h, style_w = style_img.shape[:2]
-content_long_side = max([dset.w, dset.h])
-if style_h > style_w:
-    style_img = cv2.resize(
-        style_img,
-        (int(content_long_side / style_h * style_w), content_long_side),
-        interpolation=cv2.INTER_AREA,
-    )
-else:
-    style_img = cv2.resize(
-        style_img,
-        (content_long_side, int(content_long_side / style_w * style_h)),
-        interpolation=cv2.INTER_AREA,
-    )
-style_img = cv2.resize(
-    style_img,
-    (style_img.shape[1] // 2, style_img.shape[0] // 2),
-    interpolation=cv2.INTER_AREA,
-)
-imageio.imwrite(
-    os.path.join(args.train_dir, "style_image.png"),
-    np.clip(style_img * 255.0, 0.0, 255.0).astype(np.uint8),
-)
-style_img = torch.from_numpy(style_img).to(device=device)
-ic("Style image: ", args.style, style_img.shape)
-
-
 TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/llff/fern/train_teacher_images/"
 
 
@@ -573,9 +544,9 @@ for image in teacher_images:
 
 global_start_time = datetime.now()
 
-if not args.no_pre_ct:
-    dset.rays.gt, color_tf = match_colors_for_image_set(dset.rays.gt, style_img)
-    grid.apply_ct(color_tf.detach().cpu().numpy())
+# if not args.no_pre_ct:
+#     dset.rays.gt, color_tf = match_colors_for_image_set(dset.rays.gt, style_img)
+#     grid.apply_ct(color_tf.detach().cpu().numpy())
 
 epoch_id = 0
 epoch_size = None
@@ -640,19 +611,11 @@ while True:
                             height=view_height,
                             ndc_coeffs=dset.ndc_coeffs,
                         )
-                        print("pred_rgb_id", img_id)
                         rgb_pred = grid.volume_render_image(cam, use_kernel=True)
                         
                         selected_teacher_img = imageio.imread(os.path.join(TEACHER_PATH, f"image0{img_id}.JPG")).astype(np.float32) / 255.0
 
-                        print("teacher_rgb_id", img_id)
-                        
-                        cv2.imwrite("teacher_img.png", (selected_teacher_img * 255).astype(np.uint8))
                         selected_teacher_img = torch.from_numpy(selected_teacher_img).to(device=device)
-
-                        cv2.imwrite("pred_img.png", (rgb_pred.detach().cpu().numpy() * 255).astype(np.uint8))
-                        # import pdb
-                        # pdb.set_trace()
                         rgb_gt = dset.rays.gt.view(num_views, view_height, view_width, 3)[img_id].to(
                             device
                         )

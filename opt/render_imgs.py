@@ -111,8 +111,6 @@ if args.ray_len:
 dset = datasets[args.dataset_type](args.data_dir, split="test_train" if args.train else "test",
                                     **config_util.build_data_options(args))
 
-# import pdb
-# pdb.set_trace()
 grid = svox2.SparseGrid.load(args.ckpt, device=device)
 
 if grid.use_background:
