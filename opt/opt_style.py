@@ -145,8 +145,7 @@ group = parser.add_argument_group("optimization")
 group.add_argument(
     "--n_iters",
     type=int,
-    #TODO default was 10
-    default= 6 * 12800,
+    default= 10 * 12800,
     help="total number of iters to optimize for",
 )
 group.add_argument(

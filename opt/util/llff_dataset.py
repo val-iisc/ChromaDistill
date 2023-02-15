@@ -92,9 +92,6 @@ class LLFFDataset(DatasetBase):
         self.is_train_split = is_train_split
 
         self._load_images()
-        #TODO : modified
-        # self.n_images, self.h_full, self.w_full, _ = self.gt.shape
-
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
 
         assert self.h_full == self.sfm.ref_cam["height"]

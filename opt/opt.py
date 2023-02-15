@@ -28,7 +28,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from tqdm import tqdm
 from typing import NamedTuple, Optional, Union
-from skimage import io, color
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -275,7 +274,6 @@ dset = datasets[args.dataset_type](
                n_images=args.n_train,
                **config_util.build_data_options(args))
 
-
 if args.background_nlayers > 0 and not dset.should_use_background:
     warn('Using a background model for dataset type ' + str(type(dset)) + ' which typically does not use background')
 
@@ -297,8 +295,6 @@ grid = svox2.SparseGrid(reso=reso_list[reso_id],
                         mlp_width=args.mlp_width,
                         background_nlayers=args.background_nlayers,
                         background_reso=args.background_reso)
-
-                        
 
 # DC -> gray; mind the SH scaling!
 grid.sh_data.data[:] = 0.0
@@ -380,7 +376,7 @@ while True:
         # Put in a function to avoid memory leak
         print('Eval step')
         with torch.no_grad():
-            stats_test = {'psnr' : 0.0, 'mse' : 0.0, 'mse_distillation': 0.0}
+            stats_test = {'psnr' : 0.0, 'mse' : 0.0}
 
             # Standard set
             N_IMGS_TO_EVAL = min(20 if epoch_id > 0 else 5, dset_test.n_images)
@@ -409,14 +405,7 @@ while True:
                                    ndc_coeffs=dset_test.ndc_coeffs)
                 rgb_pred_test = grid.volume_render_image(cam, use_kernel=True)
                 rgb_gt_test = dset_test.gt[img_id].to(device=device)
-                rgb_teacher_gt_test = dset_test.teacher_gt[img_id].to(device=device)
-                import numpy as np
-                cv2.imwrite("eval_pred.png",  cv2.cvtColor((rgb_pred_test.detach().cpu().numpy() * 255).astype(np.uint8), cv2.COLOR_BGR2RGB))
-                # all_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
-                all_mses = ((rgb_to_lab(rgb_gt_test) - rgb_to_lab(rgb_pred_test)) ** 2).cpu()
-                
-                # distilation_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
-                distilation_mses = ((rgb_to_lab(rgb_gt_test) - rgb_to_lab(rgb_pred_test)) ** 2).cpu()
+                all_mses = ((rgb_gt_test - rgb_pred_test) ** 2).cpu()
                 if i % img_save_interval == 0:
                     img_pred = rgb_pred_test.cpu()
                     img_pred.clamp_max_(1.0)
@@ -438,14 +427,12 @@ while True:
 
                 rgb_pred_test = rgb_gt_test = None
                 mse_num : float = all_mses.mean().item()
-                mse_distillation : float = distilation_mses.mean().item()
                 psnr = -10.0 * math.log10(mse_num)
                 if math.isnan(psnr):
                     print('NAN PSNR', i, img_id, mse_num)
                     assert False
                 stats_test['mse'] += mse_num
                 stats_test['psnr'] += psnr
-                stats_test['mse_distillation'] += mse_distillation
                 n_images_gen += 1
 
             if grid.basis_type == svox2.BASIS_TYPE_3D_TEXTURE or \
@@ -487,8 +474,7 @@ while True:
     def train_step():
         print('Train step')
         pbar = tqdm(enumerate(range(0, epoch_size, args.batch_size)), total=batches_per_epoch)
-        stats = {"mse" : 0.0, "psnr" : 0.0, "invsqr_mse" : 0.0, "lab_mse" : 0.0, "invsqr_lab_mse" : 0.0}
-        
+        stats = {"mse" : 0.0, "psnr" : 0.0, "invsqr_mse" : 0.0}
         for iter_id, batch_begin in pbar:
             gstep_id = iter_id + gstep_id_base
             if args.lr_fg_begin_step > 0 and gstep_id == args.lr_fg_begin_step:
@@ -498,7 +484,6 @@ while True:
             lr_basis = lr_basis_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
             lr_sigma_bg = lr_sigma_bg_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
             lr_color_bg = lr_color_bg_func(gstep_id - args.lr_basis_begin_step) * lr_basis_factor
-
             if not args.lr_decay:
                 lr_sigma = args.lr_sigma * lr_sigma_factor
                 lr_sh = args.lr_sh * lr_sh_factor
@@ -508,34 +493,18 @@ while True:
             batch_origins = dset.rays.origins[batch_begin: batch_end]
             batch_dirs = dset.rays.dirs[batch_begin: batch_end]
             rgb_gt = dset.rays.gt[batch_begin: batch_end]
-            teacher_gt = dset.rays.teacher_gt[batch_begin: batch_end]
             rays = svox2.Rays(batch_origins, batch_dirs)
 
             #  with Timing("volrend_fused"):
-            
             rgb_pred = grid.volume_render_fused(rays, rgb_gt,
                     beta_loss=args.lambda_beta,
                     sparsity_loss=args.lambda_sparsity,
                     randomize=args.enable_random)
 
-            
-            lab_gt = rgb_to_lab(rgb_gt)
-            lab_teacher_gt = rgb_to_lab(teacher_gt)
-            lab_pred = rgb_to_lab(rgb_pred)
-            
-            lab_mse = F.mse_loss(lab_teacher_gt,lab_pred)
+            #  with Timing("loss_comp"):
+            mse = F.mse_loss(rgb_gt, rgb_pred)
 
-            # lab_mse = 10 * (F.mse_loss(teacher_gt,rgb_pred))
- 
-            # mse = F.mse_loss(rgb_gt, rgb_pred)
-            mse = F.mse_loss(lab_gt, lab_pred)
-
-            lab_mse_num : float = lab_mse.detach().item()
-            # psnr = -10.0 * math.log10(lab_mse_num)
-            stats['lab_mse'] += lab_mse_num
-            # stats['psnr'] += psnr
-            stats['invsqr_lab_mse'] += 1.0 / lab_mse_num ** 2
-        
+            # Stats
             mse_num : float = mse.detach().item()
             psnr = -10.0 * math.log10(mse_num)
             stats['mse'] += mse_num
@@ -643,7 +612,7 @@ while True:
             factor, args.save_every) == 0 and not args.tune_mode:
         print('Saving', ckpt_path)
         grid.save(ckpt_path)
-        print("saved!")
+
     if (gstep_id_base - last_upsamp_step) >= args.upsamp_every:
         last_upsamp_step = gstep_id_base
         if reso_id < len(reso_list) - 1:
