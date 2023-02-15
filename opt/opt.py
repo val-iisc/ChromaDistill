@@ -366,44 +366,6 @@ lr_basis_factor = 1.0
 
 last_upsamp_step = args.init_iters
 
-
-	srgb_pixels = torch.reshape(srgb, [-1, 3])
-
-	linear_mask = (srgb_pixels <= 0.04045).type(torch.FloatTensor).cuda()
-	exponential_mask = (srgb_pixels > 0.04045).type(torch.FloatTensor).cuda()
-	rgb_pixels = (srgb_pixels / 12.92 * linear_mask) + (((srgb_pixels + 0.055) / 1.055) ** 2.4) * exponential_mask
-	
-	rgb_to_xyz = torch.tensor([
-				#    X        Y          Z
-				[0.412453, 0.212671, 0.019334], # R
-				[0.357580, 0.715160, 0.119193], # G
-				[0.180423, 0.072169, 0.950227], # B
-			]).type(torch.FloatTensor).cuda()
-	
-	xyz_pixels = torch.mm(rgb_pixels, rgb_to_xyz)
-	
-
-	# XYZ to Lab
-	xyz_normalized_pixels = torch.mul(xyz_pixels, torch.tensor([1/0.950456, 1.0, 1/1.088754]).type(torch.FloatTensor).cuda())
-
-	epsilon = 6.0/29.0
-
-	linear_mask = (xyz_normalized_pixels <= (epsilon**3)).type(torch.FloatTensor).cuda()
-
-	exponential_mask = (xyz_normalized_pixels > (epsilon**3)).type(torch.FloatTensor).cuda()
-
-	fxfyfz_pixels = (xyz_normalized_pixels / (3 * epsilon**2) + 4.0/29.0) * linear_mask + ((xyz_normalized_pixels+0.000001) ** (1.0/3.0)) * exponential_mask
-	# convert to lab
-	fxfyfz_to_lab = torch.tensor([
-		#  l       a       b
-		[  0.0,  500.0,    0.0], # fx
-		[116.0, -500.0,  200.0], # fy
-		[  0.0,    0.0, -200.0], # fz
-	]).type(torch.FloatTensor).cuda()
-	lab_pixels = torch.mm(fxfyfz_pixels, fxfyfz_to_lab) + torch.tensor([-16.0, 0.0, 0.0]).type(torch.FloatTensor).cuda()
-	#return tf.reshape(lab_pixels, tf.shape(srgb))
-	return torch.reshape(lab_pixels, srgb.shape)
-
 if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
