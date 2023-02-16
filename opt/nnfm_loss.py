@@ -3,7 +3,7 @@ import torchvision
 from icecream import ic
 
 def preprocess_lab(lab):
-    lab = lab.reshape(376, 504, 3) #hard coded
+    lab = lab[0].permute((1,2,0)) #hard coded
     L_chan, a_chan, b_chan =torch.unbind(lab,dim=2)
     # L_chan: black and white with input range [0, 100]
     # a_chan/b_chan: color channels with input range ~[-110, 110], not exact
