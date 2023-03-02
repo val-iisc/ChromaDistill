@@ -126,7 +126,8 @@ def build_data_options(args):
         'data_bbox_scale': args.data_bbox_scale,
         'cam_scale_factor': args.cam_scale_factor,
         'normalize_by_camera': args.normalize_by_camera,
-        'permutation': args.perm
+        'permutation': args.perm,
+        'teacher' : args.teacher
     }
 
 def maybe_merge_config_file(args, allow_invalid=False):

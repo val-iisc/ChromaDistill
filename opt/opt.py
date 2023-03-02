@@ -244,6 +244,9 @@ group.add_argument('--n_train', type=int, default=None, help='Number of training
 group.add_argument('--nosphereinit', action='store_true', default=False,
                      help='do not start with sphere bounds (please do not use for 360)')
 
+group.add_argument('--teacher', action='store_true', default=None,
+                     help='Select the teacher for distillation')
+
 args = parser.parse_args()
 config_util.maybe_merge_config_file(args)
 

@@ -400,7 +400,8 @@ group.add_argument(
     default=False,
     help="do not start with sphere bounds (please do not use for 360)",
 )
-
+group.add_argument('--teacher', action='store_true', default=None,
+                     help='Select the teacher for distillation')
 args = parser.parse_args()
 config_util.maybe_merge_config_file(args)
 
@@ -505,7 +506,9 @@ last_upsamp_step = args.init_iters
 if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
+# TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/tnt/ship/train_teacher_images"
 TEACHER_PATH = os.path.join(dset.dataset, "train_teacher_images")
+
 if not os.path.isdir(TEACHER_PATH):
     os.makedirs(TEACHER_PATH)
 
@@ -618,11 +621,10 @@ while True:
                         rgb_gt = dset.rays.gt.view(num_views, view_height, view_width, 3)[img_id].to(
                             device
                         )
-                        teacher_gt = dset.rays.teacher_gt.view(num_views, view_height, view_width, 3)[img_id].to(
-                            device
-                        )
+
+                        # teacher_gt = dset.rays.teacher_gt.view(num_views, view_height, view_width, 3)[img_id].to(device)
                         rgb_gt = rgb_gt.permute(2, 0, 1).unsqueeze(0).contiguous()
-                        teacher_gt = teacher_gt.permute(2, 0, 1).unsqueeze(0).contiguous()
+                        # teacher_gt = teacher_gt.permute(2, 0, 1).unsqueeze(0).contiguous()
                         rgb_pred = rgb_pred.permute(2, 0, 1).unsqueeze(0).contiguous()
 
                     rgb_pred.requires_grad_(True)

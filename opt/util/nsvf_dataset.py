@@ -59,6 +59,7 @@ class NSVFDataset(DatasetBase):
         self.epoch_size = epoch_size
         all_c2w = []
         all_gt = []
+        all_teacher_gt = []
 
         split_name = split if split != "test_train" else "train"
 
@@ -121,11 +122,23 @@ class NSVFDataset(DatasetBase):
 
         for img_fname in tqdm(img_files):
             img_path = path.join(root, img_dir_name, img_fname)
-            image = imageio.imread(img_path)
+            data_dir = os.path.split(os.path.split(img_path)[0])[0]
+
+            img = imageio.imread(os.path.join(data_dir, 'images', os.path.split(img_path)[1]))
+            image = cv2.resize(image, (1008, 752), interpolation=cv2.INTER_AREA)
+            img_expand = np.zeros((image.shape[0],image.shape[1],3))
+            img_expand[:,:,0] = image
+            img_expand[:,:,1] = image
+            img_expand[:,:,2] = image
+
+            teacher_image = img = imageio.imread(os.path.join(data_dir, 'rgb', os.path.split(img_path)[1]))
+            teacher_image = cv2.resize(teacher_image, (1008, 752), interpolation=cv2.INTER_AREA)
+            # teacher_image = cv2.resize(tracher_image (1008, 752), interpolation=cv2.INTER_AREA)
+
             pose_fname = path.splitext(img_fname)[0] + ".txt"
             pose_path = path.join(root, pose_dir_name, pose_fname)
             #  intrin_path = path.join(root, intrin_dir_name, pose_fname)
-
+            
             cam_mtx = np.loadtxt(pose_path).reshape(-1, 4)
             if len(cam_mtx) == 3:
                 bottom = np.array([[0.0, 0.0, 0.0, 1.0]])
@@ -135,8 +148,10 @@ class NSVFDataset(DatasetBase):
             rsz_h, rsz_w = [round(hw * scale) for hw in full_size]
             if dynamic_resize:
                 image = cv2.resize(image, (rsz_w, rsz_h), interpolation=cv2.INTER_AREA)
+                teacher_image = cv2.resize(teacher_image, (rsz_w, rsz_h), interpolation=cv2.INTER_AREA)
 
-            all_gt.append(torch.from_numpy(image))
+            all_gt.append(torch.from_numpy(img_expand))
+            all_teacher_gt.append(torch.from_numpy(teacher_image))
 
         self.c2w_f64 = torch.stack(all_c2w)
 
@@ -221,13 +236,17 @@ class NSVFDataset(DatasetBase):
             self.render_c2w = self.render_c2w_f64.float()
 
         self.gt = torch.stack(all_gt).double() / 255.0
+        self.teacher_gt = torch.stack(all_teacher_gt).double() / 255.0
         if self.gt.size(-1) == 4:
             if white_bkgd:
                 # Apply alpha channel
                 self.gt = self.gt[..., :3] * self.gt[..., 3:] + (1.0 - self.gt[..., 3:])
+                self.teacher_gt = self.teacher_gt[..., :3] * self.teacher_gt[..., 3:] + (1.0 - self.teacher_gt[..., 3:])
             else:
                 self.gt = self.gt[..., :3]
+                self.teacher_gt = self.teacher_gt[..., :3]
         self.gt = self.gt.float()
+        self.teacher_gt = self.teacher_gt.float()
 
         assert full_size[0] > 0 and full_size[1] > 0, "Empty images"
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
@@ -257,7 +276,6 @@ class NSVFDataset(DatasetBase):
 
         self.intrins_full: Intrin = Intrin(fx, fy, cx, cy)
         print(" intrinsics (loaded reso)", self.intrins_full)
-
         self.scene_scale = scene_scale
         if self.split == "train":
             self.gen_rays(factor=factor)

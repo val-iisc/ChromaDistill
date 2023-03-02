@@ -31,8 +31,7 @@ class DatasetBase:
         """
         if self.split == "train":
             del self.rays
-            self.rays = select_or_shuffle_rays(self.rays_init, self.permutation,
-                                               self.epoch_size, self.device)
+            self.rays = select_or_shuffle_rays(self.rays_init, self.permutation, self.epoch_size, self.device)
 
     def gen_rays(self, factor=1):
         print(" Generating rays, scaling factor", factor)

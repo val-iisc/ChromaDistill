@@ -49,6 +49,11 @@ parser.add_argument('--fps',
                     default=30,
                     help="FPS of video")
 
+parser.add_argument('--teacher',
+                    type=int,
+                    default=None,
+                    help="FPS of video")
+
 # Camera adjustment
 parser.add_argument('--crop',
                     type=float,

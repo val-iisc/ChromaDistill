@@ -13,6 +13,9 @@ if [[ ! -f "${ckpt_svox2}/ckpt.npz" ]]; then
                 -c configs/tnt.json
 fi
 
+python render_imgs.py ${ckpt_svox2}/ckpt.npz ${data_dir} \
+                --render_path --no_imsave
+
 
 python opt_style.py -t ${ckpt_arf} ${data_dir} \
                 -c configs/tnt_fixgeom.json  \
@@ -20,6 +23,8 @@ python opt_style.py -t ${ckpt_arf} ${data_dir} \
                 --style ${style_img} \
                 --mse_num_epoches 1 --nnfm_num_epoches 10 \
                 --content_weight 5e-3
+
+
 
 python render_imgs.py ${ckpt_arf}/ckpt.npz ${data_dir} \
                 --render_path --no_imsave

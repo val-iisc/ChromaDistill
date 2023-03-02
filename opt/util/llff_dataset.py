@@ -76,7 +76,8 @@ class LLFFDataset(DatasetBase):
             offset=offset,
             hold_every=hold_every,
         )
-
+        self.teacher_id = kwargs.get('teacher')
+        
         assert len(self.sfm.cams) == 1, \
                 "Currently assuming 1 camera for simplicity, " \
                 "please feel free to extend"
@@ -90,7 +91,6 @@ class LLFFDataset(DatasetBase):
                 self.imgs.append(img)
 
         self.is_train_split = is_train_split
-
         self._load_images()
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
 
@@ -137,10 +137,11 @@ class LLFFDataset(DatasetBase):
                     # Hack: also try png
                     if os.path.exists(path_noext + '.png'):
                         img_path = path_noext + '.png'
-                img = imageio.imread(img_path)
-                img = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
 
-                teacher_img = imageio.imread(img_path.replace("images", "teacher_images"))
+                data_dir = os.path.split(os.path.split(img_path)[0])[0]
+                img = imageio.imread(os.path.join(data_dir, 'images', os.path.split(img_path)[1]))
+                img = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
+                teacher_img = imageio.imread(os.path.join(data_dir, f'teacher_images_{self.teacher_id}', os.path.split(img_path)[1]))
                 teacher_img = cv2.resize(teacher_img, (1008, 752), interpolation=cv2.INTER_AREA)
 
                 if scale != 1 and not self.sfm.use_integral_scaling:
