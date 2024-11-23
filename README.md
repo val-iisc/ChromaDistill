@@ -2,7 +2,7 @@
 
 <h1>ChromaDistill : Colorizing Monochrome Radiance Fields with Knowledge
 Distillation</h1>
-<h1>Accepted at WACV 2025</h1>
+<h1>WACV 2025</h1>
 
 <p align="center">
     <a href="https://www.linkedin.com/in/ankit-dhiman-46109a174/" target="_blank"><strong>Ankit Dhiman</strong></a> <sup>1,2<b></b></sup>
@@ -11,7 +11,7 @@ Distillation</h1>
     ·
     <a href="https://www.linkedin.com/in/srinjay-sarkar-1501b9112/" target="_blank"><strong>Srinjay Sarkar</strong></a> <sup>1</sup>
     ·
-    <a href="https://in.linkedin.com/in/lokesh-boregowda-14321810" target="_blank"><strong>Lokesh R Boregowda</strong></a> <sup>3</sup>
+    <a href="https://in.linkedin.com/in/lokesh-boregowda-14321810" target="_blank"><strong>Lokesh R Boregowda</strong></a> <sup>2</sup>
     ·
     <a href="https://cds.iisc.ac.in/faculty/venky/" target="_blank"><strong>R Venkatesh Babu</strong></a> <sup>1</sup>
 </p>
