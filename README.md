@@ -42,18 +42,12 @@ Distillation</h1>
 ```bash
 . ./download_data.sh
 ```
-### Optimize artistic radiance fields
+### Optimize radiance field
 ```bash
-cd opt && . ./try_{llff/tnt/custom}.sh [scene_name] [style_id]
+cd opt && . ./try_llff.sh
 ```
-* Select ```{llff/tnt/custom}``` according to your data type. For example, use ```llff``` for ```flower``` scene, ```tnt``` for ```Playground``` scene, and ```custom``` for ```lego``` scene. 
-* ```[style_id].jpg``` is the style image inside ```./data/styles```. For example, ```14.jpg``` is the starry night painting.
-* Note that a photorealistic radiance field will first be reconstructed for each scene, if it doesn't exist on disk. This will take extra time.
 
-
-## Acknowledgement:
-We would like to thank [ARF](https://github.com/Kai-46/ARF-svox2) authors for open-sourcing their implementations.
-
+* Note that you'll need to create a teacher_images folder with the colorised images generated with the teacher network for distilation.
 
 ## 📖 Abstract
 
@@ -72,3 +66,7 @@ Neural radiance field (NeRF) and Gaussian-Splatting based methods enable high-qu
       url={https://arxiv.org/abs/2309.07668}, 
 }
 ```
+
+## Acknowledgement:
+We would like to thank [ARF](https://github.com/Kai-46/ARF-svox2) authors for open-sourcing their implementations.
+
