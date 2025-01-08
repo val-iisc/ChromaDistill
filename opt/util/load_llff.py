@@ -373,6 +373,10 @@ def load_llff_data(
         dt = 0.75
         mean_dz = 1.0 / (((1.0 - dt) / close_depth + dt / inf_depth))
         focal = mean_dz
+        
+        # print("sdfcbvdsucvbudsvbcuysc",focal)
+        
+        # exit()
 
         # Get radii for spiral path
         tt = poses[:, :3, 3]  # ptstocam(poses[:3,3,:].T, c2w).T

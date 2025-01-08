@@ -150,13 +150,14 @@ if not args.no_imsave:
 # NOTE: no_grad enables the fast image-level rendering kernel for cuvol backend only
 # other backends will manually generate rays per frame (slow)
 with torch.no_grad():
-    n_images = dset.render_c2w.size(0) if args.render_path else dset.n_images
+
+    n_images = dset.n_images
     img_eval_interval = max(n_images // args.n_eval, 1)
     avg_psnr = 0.0
     avg_ssim = 0.0
     avg_lpips = 0.0
     n_images_gen = 0
-    c2ws = dset.render_c2w.to(device=device) if args.render_path else dset.c2w.to(device=device)
+    c2ws =  dset.c2w.to(device=device)
     # DEBUGGING
     #  rad = [1.496031746031746, 1.6613756613756614, 1.0]
     #  half_sz = [grid.links.size(0) // 2, grid.links.size(1) // 2]
@@ -214,7 +215,7 @@ with torch.no_grad():
                     print(img_id, 'PSNR', psnr, 'SSIM', ssim, 'LPIPS', lpips_i)
                 else:
                     print(img_id, 'PSNR', psnr, 'SSIM', ssim)
-        img_path = path.join(render_dir, f'{img_id:04d}.png');
+        img_path = path.join(render_dir, f'{img_id:04d}.png')
         im = im.cpu().numpy()
         if not args.render_path:
             im_gt = dset.gt[img_id].numpy()

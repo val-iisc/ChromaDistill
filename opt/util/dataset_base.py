@@ -34,6 +34,7 @@ class DatasetBase:
             self.rays = select_or_shuffle_rays(self.rays_init, self.permutation, self.epoch_size, self.device)
 
     def gen_rays(self, factor=1):
+
         print(" Generating rays, scaling factor", factor)
         # Generate rays
         self.factor = factor
@@ -66,12 +67,15 @@ class DatasetBase:
         else:
             gt = self.gt.reshape(self.n_images, -1, 3)
             teacher_gt = self.teacher_gt.reshape(self.n_images, -1, 3)
+        
+
         origins = self.c2w[:, None, :3, 3].expand(-1, self.h * self.w, -1).contiguous()
         if self.split == "train":
             origins = origins.view(-1, 3)
             dirs = dirs.view(-1, 3)
             gt = gt.reshape(-1, 3)
             teacher_gt = teacher_gt.reshape(-1, 3)
+
         self.rays_init = Rays(origins=origins, dirs=dirs, gt=gt, teacher_gt = teacher_gt)
         self.rays = self.rays_init
 

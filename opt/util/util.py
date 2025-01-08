@@ -23,6 +23,7 @@ class Rays:
         dirs = self.dirs.to(*args, **kwargs)
         gt = self.gt.to(*args, **kwargs)
         teacher_gt = self.teacher_gt.to(*args, **kwargs)
+
         return Rays(origins, dirs, gt, teacher_gt)
 
     def __getitem__(self, key):
@@ -184,6 +185,7 @@ def select_or_shuffle_rays(rays_init : Rays,
                  device: Union[str, torch.device] = "cpu"):
     n_rays = rays_init.origins.size(0)
     n_samp = n_rays if (epoch_size is None) else epoch_size
+
     if permutation:
         print(" Shuffling rays")
         indexer = torch.randperm(n_rays, device='cpu')[:n_samp]

@@ -159,7 +159,7 @@ class Camera:
         Generate the rays for this camera
         :return: (origins (H*W, 3), dirs (H*W, 3))
         """
-        origins = self.c2w[None, :3, 3].expand(self.height * self.width, -1).contiguous()
+        origins = self.c2w[None, :3, 3].expand(self.height * self.width, -1).contiguous()       
         yy, xx = torch.meshgrid(
             torch.arange(self.height, dtype=torch.float64, device=self.c2w.device) + 0.5,
             torch.arange(self.width, dtype=torch.float64, device=self.c2w.device) + 0.5,

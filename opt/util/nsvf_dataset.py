@@ -14,6 +14,47 @@ from tqdm import tqdm
 import numpy as np
 from warnings import warn
 
+# def viewmatrix(z,up,pos):
+#     """calculates the central mean pose for the dataset based on mean translation(center);the mean z-axis(vec2);
+#         adopting mean y-axis(up) as up direxction so that the cross(up,z)=x and cross(z,x)=y. then rearrange the R matrix according to this."""
+#     #step 4
+#     vec2=normalize(z)
+#     vec1_avg=up
+#     vec0=normalize(np.cross(vec1_avg,vec2))
+#     #step 5
+#     vec1=normalize(np.cross(vec2,vec0))
+#     mat=np.stack([vec0,vec1,vec2,pos],1)
+#     return (mat)
+
+def viewmatrix(z, up, pos):
+    vec2 = normalize(z)
+    vec1_avg = up
+    print(vec1_avg.shape,vec2.shape)
+    vec0 = normalize(np.cross(vec1_avg, vec2))
+    vec1 = normalize(np.cross(vec2, vec0))
+    m = np.stack([vec0, vec1, vec2, pos], 1)
+    return m
+
+
+def normalize(x):
+    x_norm=x/np.linalg.norm(x)
+    return (x_norm)
+
+def render_path_spiral(c2w, up, rads, focal, zrate, rots, N):
+    render_poses = []
+    rads = np.array(list(rads) + [1.0])
+    # hwf = c2w[:,4:5]
+
+    for theta in np.linspace(0.0, 2.0 * np.pi * rots, N + 1)[:-1]:
+        c = np.dot(
+            c2w[:3, :4],
+            np.array([np.cos(theta), -np.sin(theta), -np.sin(theta * zrate), 1.0])
+            * rads,
+        )
+        z = normalize(c - np.dot(c2w[:3, :4], np.array([0, 0, -focal, 1.0])))
+        # render_poses.append(np.concatenate([viewmatrix(z, up, c), hwf], 1))
+        render_poses.append(viewmatrix(z, up, c))
+    return render_poses
 
 class NSVFDataset(DatasetBase):
     """
@@ -125,13 +166,13 @@ class NSVFDataset(DatasetBase):
             data_dir = os.path.split(os.path.split(img_path)[0])[0]
 
             img = imageio.imread(os.path.join(data_dir, 'images', os.path.split(img_path)[1]))
-            image = cv2.resize(image, (1008, 752), interpolation=cv2.INTER_AREA)
+            image = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
             img_expand = np.zeros((image.shape[0],image.shape[1],3))
             img_expand[:,:,0] = image
             img_expand[:,:,1] = image
             img_expand[:,:,2] = image
-
-            teacher_image = img = imageio.imread(os.path.join(data_dir, 'rgb', os.path.split(img_path)[1]))
+            image = img_expand
+            teacher_image = imageio.imread(os.path.join(data_dir, 'teacher_images', os.path.split(img_path)[1]))
             teacher_image = cv2.resize(teacher_image, (1008, 752), interpolation=cv2.INTER_AREA)
             # teacher_image = cv2.resize(tracher_image (1008, 752), interpolation=cv2.INTER_AREA)
 
@@ -150,10 +191,21 @@ class NSVFDataset(DatasetBase):
                 image = cv2.resize(image, (rsz_w, rsz_h), interpolation=cv2.INTER_AREA)
                 teacher_image = cv2.resize(teacher_image, (rsz_w, rsz_h), interpolation=cv2.INTER_AREA)
 
-            all_gt.append(torch.from_numpy(img_expand))
+            all_gt.append(torch.from_numpy(image))
             all_teacher_gt.append(torch.from_numpy(teacher_image))
 
         self.c2w_f64 = torch.stack(all_c2w)
+        #  up = normalize(poses[:, :3, 1].sum(0))
+        up=normalize(self.c2w_f64[:,:3,1].sum(0))
+        rads=np.percentile(np.abs(self.c2w_f64[:,:3,3]),90,axis=0)
+        
+        
+        self.c2w_f64 = render_path_spiral(self.c2w_f64,up,rads,4.30,0.5,2,120)
+        # c2w, up, rads, focal, zrate, rots, N
+        
+        # import pdb
+        # pdb.set_trace()
+        
 
         # load render_c2w
         self.has_render_c2w = path.exists(path.join(root, "camera_path"))
@@ -231,6 +283,18 @@ class NSVFDataset(DatasetBase):
         self.c2w_f64[:, :3, 3] *= scene_scale
         self.c2w = self.c2w_f64.float()
 
+        # if not self.is_train_split:
+        #     render_c2w = []
+        #     for idx in tqdm(range(len(self.sfm.render_poses))):
+        #         R = self.sfm.render_poses[idx]["R"].astype(np.float64)
+        #         t = self.sfm.render_poses[idx]["center"].astype(np.float64)
+        #         c2w = np.concatenate([R, t], axis=1)
+        #         c2w = np.concatenate([c2w, bottom], axis=0)
+        #         render_c2w.append(torch.from_numpy(c2w.astype(np.float32)))
+        #     self.render_c2w = torch.stack(render_c2w)
+        #     if bds_scale != 1.0:
+        #         self.render_c2w[:, :3, 3] *= bds_scale
+
         if self.has_render_c2w:
             self.render_c2w_f64[:, :3, 3] *= scene_scale
             self.render_c2w = self.render_c2w_f64.float()
@@ -249,7 +313,7 @@ class NSVFDataset(DatasetBase):
         self.teacher_gt = self.teacher_gt.float()
 
         assert full_size[0] > 0 and full_size[1] > 0, "Empty images"
-        self.n_images, self.h_full, self.w_full, _ = self.gt.shape
+        self.n_images, self.h_full, self.w_full, _  = self.gt.shape
 
         intrin_path = path.join(root, "intrinsics.txt")
         assert path.exists(intrin_path), "intrinsics unavailable"
@@ -277,6 +341,7 @@ class NSVFDataset(DatasetBase):
         self.intrins_full: Intrin = Intrin(fx, fy, cx, cy)
         print(" intrinsics (loaded reso)", self.intrins_full)
         self.scene_scale = scene_scale
+
         if self.split == "train":
             self.gen_rays(factor=factor)
         else:

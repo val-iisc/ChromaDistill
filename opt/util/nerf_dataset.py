@@ -91,7 +91,9 @@ class NeRFDataset(DatasetBase):
             else:
                 self.gt = self.gt[..., :3]
 
-        self.n_images, self.h_full, self.w_full, _ = self.gt.shape
+        import pdb
+        pdb.set_trace()
+        self.n_images, self.h_full, self.w_full = self.gt.shape
         # Choose a subset of training images
         if n_images is not None:
             if n_images > self.n_images:

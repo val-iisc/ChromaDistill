@@ -92,6 +92,7 @@ class LLFFDataset(DatasetBase):
 
         self.is_train_split = is_train_split
         self._load_images()
+        # self.n_images, self.h_full, self.w_full = self.gt.shape
         self.n_images, self.h_full, self.w_full, _ = self.gt.shape
 
         assert self.h_full == self.sfm.ref_cam["height"]
@@ -141,7 +142,8 @@ class LLFFDataset(DatasetBase):
                 data_dir = os.path.split(os.path.split(img_path)[0])[0]
                 img = imageio.imread(os.path.join(data_dir, 'images', os.path.split(img_path)[1]))
                 img = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
-                teacher_img = imageio.imread(os.path.join(data_dir, f'teacher_images_{self.teacher_id}', os.path.split(img_path)[1]))
+
+                teacher_img = imageio.imread(os.path.join(data_dir, f'teacher_images', os.path.split(img_path)[1]))
                 teacher_img = cv2.resize(teacher_img, (1008, 752), interpolation=cv2.INTER_AREA)
 
                 if scale != 1 and not self.sfm.use_integral_scaling:
@@ -153,12 +155,14 @@ class LLFFDataset(DatasetBase):
                         newh = round(h * scale)
                         neww = round(w * scale)
                     img = cv2.resize(img, (neww, newh), interpolation=cv2.INTER_AREA)
-
+                
+                # import pdb
+                # pdb.set_trace()
                 img_expand = np.zeros((img.shape[0],img.shape[1],3))
                 img_expand[:,:,0] = img
                 img_expand[:,:,1] = img
                 img_expand[:,:,2] = img
-                # img = np.expand_dims(img, axis=-1)
+                # img = np.expand_dims(img_expand, axis=-1)
 
                 all_gt.append(torch.from_numpy(img_expand))
                 all_teacher_gt.append(torch.from_numpy(teacher_img))

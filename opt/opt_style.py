@@ -507,7 +507,7 @@ if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
 # TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/tnt/ship/train_teacher_images"
-TEACHER_PATH = os.path.join(dset.dataset, "train_teacher_images")
+TEACHER_PATH = "/data/srinath/_color_ARF/data/tnt/Family/teacher_images" #os.path.join(dset.dataset, "train_teacher_images")
 
 if not os.path.isdir(TEACHER_PATH):
     os.makedirs(TEACHER_PATH)
