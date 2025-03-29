@@ -23,6 +23,9 @@ Distillation</h1>
     <br>
 </p>
 
+<a href="https://openaccess.thecvf.com/content/WACV2025/papers/Dhiman_ChromaDistill__Colorizing_Monochrome_Radiance_Fields_with_Knowledge_Distillation_WACV_2025_paper.pdf" target="_blank" rel="noopener noreferrer">
+  <img src="https://img.shields.io/badge/WACV-ChromaDistill-blue" alt="Paper PDF">
+</a>
 <a href="https://arxiv.org/abs/2309.07668">
 <img src='https://img.shields.io/badge/arxiv-ChromaDistill-red' alt='Paper PDF'></a>
 <a href="https://val.cds.iisc.ac.in/chroma-distill.github.io/">
@@ -56,14 +59,13 @@ Neural radiance field (NeRF) and Gaussian-Splatting based methods enable high-qu
 ## 🤝🏼 Cite Us
 
 ```
-@misc{dhiman2023corfcolorizingradiance,
-      title={CoRF : Colorizing Radiance Fields using Knowledge Distillation}, 
-      author={Ankit Dhiman and R Srinath and Srinjay Sarkar and Lokesh R Boregowda and R Venkatesh Babu},
-      year={2023},
-      eprint={2309.07668},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV},
-      url={https://arxiv.org/abs/2309.07668}, 
+@InProceedings{Dhiman_2025_WACV,
+    author    = {Dhiman, Ankit and R, Srinath and Sarkar, Srinjay and Boregowda, Lokesh and Radhakrishnan, Venkatesh Babu},
+    title     = {ChromaDistill : Colorizing Monochrome Radiance Fields with Knowledge Distillation},
+    booktitle = {Proceedings of the Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {February},
+    year      = {2025},
+    pages     = {2400-2410}
 }
 ```
 
