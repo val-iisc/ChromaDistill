@@ -31,6 +31,30 @@ from typing import Union, Optional
 
 from svox2.utils import convert_to_ndc
 
+def find_teacher_image(img_path):
+    """
+    Locate the teacher (colorized) image matching a training image. Looks in a
+    teacher_images folder beside the images, and in the <images>_bigcolor folder
+    the released LLFF data ships them in, at the same resolution as the inputs.
+    Tolerates a differing extension (e.g. IMG_4026.JPG -> IMG_4026.jpg).
+    Returns None if no candidate exists.
+    """
+    image_dir, file_name = os.path.split(img_path)
+    data_dir = os.path.split(image_dir)[0]
+    teacher_dirs = [os.path.join(data_dir, 'teacher_images'),
+                    image_dir + '_bigcolor']
+    stem = os.path.splitext(file_name)[0]
+    names = [file_name] + [stem + ext for ext in
+                           ('.jpg', '.JPG', '.jpeg', '.png', '.PNG')]
+    for teacher_dir in teacher_dirs:
+        if not os.path.isdir(teacher_dir):
+            continue
+        for name in names:
+            teacher_path = os.path.join(teacher_dir, name)
+            if os.path.isfile(teacher_path):
+                return teacher_path
+    return None
+
 class LLFFDataset(DatasetBase):
     """
     LLFF dataset loader adapted from NeX code
@@ -77,6 +101,7 @@ class LLFFDataset(DatasetBase):
             hold_every=hold_every,
         )
         self.teacher_id = kwargs.get('teacher')
+        self.train_on_teacher = bool(kwargs.get('train_on_teacher'))
         
         assert len(self.sfm.cams) == 1, \
                 "Currently assuming 1 camera for simplicity, " \
@@ -139,11 +164,19 @@ class LLFFDataset(DatasetBase):
                     if os.path.exists(path_noext + '.png'):
                         img_path = path_noext + '.png'
 
-                data_dir = os.path.split(os.path.split(img_path)[0])[0]
-                img = imageio.imread(os.path.join(data_dir, 'images', os.path.split(img_path)[1]))
+                img = imageio.imread(img_path)
+                if img.ndim == 3:
+                    # Inputs are monochrome, but may be stored as 3 equal channels
+                    img = cv2.cvtColor(img[..., :3], cv2.COLOR_RGB2GRAY)
                 img = cv2.resize(img, (1008, 752), interpolation=cv2.INTER_AREA)
 
-                teacher_img = imageio.imread(os.path.join(data_dir, f'teacher_images', os.path.split(img_path)[1]))
+                teacher_path = find_teacher_image(img_path)
+                if teacher_path is None:
+                    raise FileNotFoundError(
+                        f'No teacher image found for {img_path}: expected a '
+                        'teacher_images or <images>_bigcolor folder holding the '
+                        'images colorized by the teacher network')
+                teacher_img = imageio.imread(teacher_path)
                 teacher_img = cv2.resize(teacher_img, (1008, 752), interpolation=cv2.INTER_AREA)
 
                 if scale != 1 and not self.sfm.use_integral_scaling:
@@ -174,6 +207,12 @@ class LLFFDataset(DatasetBase):
             self.gt = self.gt[..., :3] * self.gt[..., 3:] + (1.0 - self.gt[..., 3:])
         if self.teacher_gt.size(-1) == 4:
             self.teacher_gt = self.teacher_gt[..., :3] * self.teacher_gt[..., 3:] + (1.0 - self.teacher_gt[..., 3:])
+        if self.train_on_teacher:
+            # Baseline: fit the field straight to the colorized images, so the
+            # radiance field never sees the monochrome inputs and no distillation
+            # stage runs. Any view inconsistency in the 2D colorization is left
+            # for the field to reconcile on its own.
+            self.gt = self.teacher_gt
         self.c2w = torch.stack(all_c2w)
         bds_scale = 1.0
         self.z_bounds = [self.sfm.dmin * bds_scale, self.sfm.dmax * bds_scale]

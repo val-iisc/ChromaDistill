@@ -1,29 +1,31 @@
 # run: conda env create -f environment.yml
-name: arf-svox2
+name: chroma-distill
 channels:
-  - pytorch
   - defaults
 dependencies:
-  - python=3.8.8
-  - numpy>=1.16.4,<1.19.0
+  - python=3.10
   - pip
   - pip:
-      - imageio
-      - imageio-ffmpeg
-      - ipdb
-      - lpips
+      # torch 2.0.0 / cu117 is the combination this release was verified with
+      - --extra-index-url https://download.pytorch.org/whl/cu117
+      - torch==2.0.0
+      - torchvision==0.15.1
+      - numpy==1.26.4
+      - typing_extensions
       - opencv-python>=4.4.0
       - Pillow>=7.2.0
-      - pyyaml>=5.3.1
-      - tensorboard>=2.4.0
       - imageio
       - imageio-ffmpeg
-      - pymcubes
-      - moviepy
+      - lpips
       - matplotlib
+      - moviepy
+      - pymcubes
+      - pyyaml>=5.3.1
       - scipy>=1.6.0
-  - pytorch
-  - torchvision
-  - cudatoolkit
-  - tqdm
-
+      - tensorboard>=2.4.0
+      - tqdm
+      - ipdb
+      # icecream is used for logging in opt_style.py; asttokens is its
+      # source-inspection dependency and is not pulled in automatically
+      - icecream
+      - asttokens

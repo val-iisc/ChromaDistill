@@ -5,7 +5,7 @@ Distillation</h1>
 <h1>WACV 2025</h1>
 
 <p align="center">
-    <a href="https://www.linkedin.com/in/ankit-dhiman-46109a174/" target="_blank"><strong>Ankit Dhiman</strong></a> <sup>1,2<b></b></sup>
+    <a href="https://ankitdhim.github.io/" target="_blank"><strong>Ankit Dhiman</strong></a> <sup>1,2<b></b></sup>
     ·
     <a href="https://rsrinath14.github.io/" target="_blank"><strong>R Srinath</strong></a> <sup>1<b></b></sup>
     ·
@@ -45,12 +45,30 @@ Distillation</h1>
 ```bash
 . ./download_data.sh
 ```
-### Optimize radiance field
-```bash
-cd opt && . ./try_llff.sh
+
+### Data layout
+
+Each scene holds the monochrome inputs and the images colorized by the teacher
+network. The teacher images are looked up either in a `teacher_images` folder,
+or in an `<images>_bigcolor` folder beside the inputs at the matching
+resolution, which is how the released LLFF data ships them:
+
+```
+<scene>/
+    poses_bounds.npy
+    images/                 # monochrome inputs (1 or 3 equal channels)
+    images_4/               # pre-scaled inputs, used by default
+    images_4_bigcolor/      # teacher (colorized) images for images_4
 ```
 
-* Note that you'll need to create a teacher_images folder with the colorised images generated with the teacher network for distilation.
+### Colorize a scene
+```bash
+cd opt && . ./try_llff.sh <scene> <path_to_llff_data>
+```
+
+This runs both stages: `opt.py` fits a radiance field to the monochrome inputs,
+then `opt_style.py` distils colour from the teacher images into it with the
+geometry held fixed. `render_imgs.py` writes out the novel views and metrics.
 
 ## 📖 Abstract
 

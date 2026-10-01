@@ -60,6 +60,11 @@ def define_common_args(parser : argparse.ArgumentParser):
     group.add_argument('--perm', action='store_true', default=False,
                          help='sample by permutation of rays (true epoch) instead of '
                               'uniformly random rays')
+    group.add_argument('--train_on_teacher', action='store_true', default=False,
+                         help="Use the teacher's colorized images as the training "
+                              "target instead of the monochrome inputs. Gives the "
+                              "single-stage colorize-then-fit baseline; no "
+                              "distillation is involved (LLFF only)")
 
     group = parser.add_argument_group("Render options")
     group.add_argument('--step_size',
@@ -127,7 +132,8 @@ def build_data_options(args):
         'cam_scale_factor': args.cam_scale_factor,
         'normalize_by_camera': args.normalize_by_camera,
         'permutation': args.perm,
-        'teacher' : args.teacher
+        'teacher' : args.teacher,
+        'train_on_teacher': args.__dict__.get('train_on_teacher', False)
     }
 
 def maybe_merge_config_file(args, allow_invalid=False):

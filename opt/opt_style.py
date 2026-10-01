@@ -506,11 +506,10 @@ last_upsamp_step = args.init_iters
 if args.enable_random:
     warn("Randomness is enabled for training (normal for LLFF & scenes with background)")
 
-# TEACHER_PATH = "/raid/ankit/srinath/color_ARF/data/tnt/ship/train_teacher_images"
-TEACHER_PATH = "/data/srinath/_color_ARF/data/tnt/Family/teacher_images" #os.path.join(dset.dataset, "train_teacher_images")
-
-if not os.path.isdir(TEACHER_PATH):
-    os.makedirs(TEACHER_PATH)
+# Teacher images are cached per run so that concurrent runs, and runs on
+# different scenes, cannot read each other's images.
+TEACHER_PATH = os.path.join(args.train_dir, "teacher_images")
+os.makedirs(TEACHER_PATH, exist_ok=True)
 
 for image in range(dset.n_images):
     # teacher_img = imageio.imread(os.path.join(TEACHER_PATH, image)).astype(np.float32) / 255.0
