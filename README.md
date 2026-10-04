@@ -70,6 +70,12 @@ This runs both stages: `opt.py` fits a radiance field to the monochrome inputs,
 then `opt_style.py` distils colour from the teacher images into it with the
 geometry held fixed. `render_imgs.py` writes out the novel views and metrics.
 
+### 3D Gaussian Splatting backbone
+
+The same two-stage pipeline on a [gsplat](https://github.com/nerfstudio-project/gsplat)
+3DGS backbone is in [`3DGS_Representation/`](3DGS_Representation), which has its own
+environment and run instructions.
+
 ## 📖 Abstract
 
 Neural radiance field (NeRF) and Gaussian-Splatting based methods enable high-quality novel-view synthesis for multi-view images. The question arises: Can these representations generate colorized novel views when provided with monochromatic(grey-scale) inputs? Beyond its visual aesthetic significance in portraying worlds, color plays a pivotal role in downstream applications such as open-set scene decomposition. This research presents a method for synthesizing colorized novel views from input grey-scale multi-view images. Applying image or video-based colorization techniques to generated grey-scale novel views demonstrates artifacts arising from inconsistencies across views. Even training a radiance field network on colorized grey-scale image sequences fails to resolve the 3D consistency issue. We propose a distillation-based approach, leveraging knowledge from colorization networks trained on natural images and transferring it to the chosen 3D representation. Specifically, our method uses the radiance field network as a 3D representation and transfers knowledge from existing 2D colorization methods. This strategy introduces no additional weights or computational overhead to the original representation during inference. The experimental results demonstrate the superiority of our proposed method in generating high-quality colorized novel views for indoor and outdoor scenes, showcasing notable advantages in cross-view consistency compared to baseline approaches. Additionally, we illustrate the seamless extension of our method to a Gaussian-Splatting representation.

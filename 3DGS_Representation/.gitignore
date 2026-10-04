@@ -1,0 +1,15 @@
+# Run outputs
+ckpt_*/
+cache/
+logs/
+videos/
+results/
+qualitative/
+.pydeps/
+__pycache__/
+*.pyc
+
+# Internal: evaluation metrics, figure generators, run scripts and development notes.
+# The public release ships the method and how to train it; this is the apparatus that
+# produced the paper's results.
+utilities/
